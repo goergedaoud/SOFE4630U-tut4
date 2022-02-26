@@ -136,7 +136,7 @@ def run(argv=None):
         predictions| "To SQL">> relational_db.Write(source_config=output_config,table_config=table_config)
     elif known_args.source == 'kafka':
         from beam_nuggets.io import kafkaio
-        consumer_config = {"topic": "mnist_image",'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
+        consumer_config = {"topic": known_args.input,'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
             'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
             'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
         server_config = {'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
@@ -148,8 +148,8 @@ def run(argv=None):
         images |'Print' >> beam.Map(print)
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
             | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
-        predictions |'Print2' >> beam.Map(print)
-        predictions |'tokafka2' >> beam.ParDo(ProduceKafkaMessage("mnist_predict",server_config))
+        #predictions |'Print2' >> beam.Map(print)
+        predictions |'tokafka2' >> beam.ParDo(ProduceKafkaMessage(known_args.output,server_config))
     elif known_args.source == 'bq':
         schema = 'imageKey:INTEGER'
         for i in range(10):

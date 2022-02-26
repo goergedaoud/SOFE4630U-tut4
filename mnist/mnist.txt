@@ -67,7 +67,7 @@ python ./predictV2.py \
     --temp_location ./temp \
     --setup_file ./setup.py \
     --model ./data \
-    --source kafka \
+    --source mysql \
 	--input $MYSQLIP \
     --output $MYSQLIP
 
@@ -90,5 +90,5 @@ python ./predictV3.py \
     --setup_file ./setup.py \
     --model ./data \
     --source kafka \
-	--input $MYSQLIP \
-    --output $MYSQLIP
+	--input mnist_image \
+    --output mnist_predict
