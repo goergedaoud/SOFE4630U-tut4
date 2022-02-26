@@ -50,6 +50,7 @@ class CustomCommands(setuptools.Command):
 
 CUSTOM_COMMANDS = [['pip', 'install','tensorflow-cpu==2.8.0'],
 ['pip', 'install','beam-nuggets'],
+['pip', 'install','kafka-python'],
 ]
 
 REQUIRED_PACKAGES = []
