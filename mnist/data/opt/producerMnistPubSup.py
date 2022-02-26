@@ -16,7 +16,7 @@ publisher = pubsub_v1.PublisherClient()
 # in the form `projects/{project_id}/topics/{topic_id}`
 topic_path = publisher.topic_path(project_id, topic_id)
 
-file1 = open('images.txt', 'r')
+file1 = open('../images.txt', 'r')
 
 while True:
     line = file1.readline()
