@@ -145,7 +145,7 @@ def run(argv=None):
         images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
             consumer_config=consumer_config,value_decoder=bytes.decode) 
             | 'Writing to stdout' >> beam.Map(lambda x : json.loads(x[1])))
-        images |'Print' >> beam.Map(print)
+        #images |'Print' >> beam.Map(print)
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
             | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
         #predictions |'Print2' >> beam.Map(print)
