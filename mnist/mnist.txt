@@ -46,6 +46,8 @@ kubectl apply -f mysql-app.yaml
 kubectl get services
 MYSQLIP=$(kubectl get services mysql -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo $MYSQLIP
+pip install beam-nuggets
+mysql -uuser -pSOFE4630U  -h$MYSQLIP <./data/images.sql
 
 python ./predictV2.py \
     --staging_location ./staging \
@@ -55,16 +57,21 @@ python ./predictV2.py \
     --source mysql \
 	--input $MYSQLIP \
     --output $MYSQLIP
-	
+
+mysql -uuser -pSOFE4630U  -h$MYSQLIP <<<"use myDB; show tables;"
+mysql -uuser -pSOFE4630U  -h$MYSQLIP <<<"select * from myDB.results;"
+mysql -uuser -pSOFE4630U  -h$MYSQLIP <<<"drop table myDB.results;"
+
 python ./predictV2.py \
     --runner DataflowRunner \
     --project $PROJECT \
     --staging_location $BUCKET/staging \
     --temp_location $BUCKET/temp \
     --model $BUCKET/model \
-    --source text \
+    --source mysql \
 	--setup_file ./setup.py \
-    --input $BUCKET/input/images.txt \
-    --output $BUCKET/output/predict \
+	--input $MYSQLIP \
+    --output $MYSQLIP \
 	--region  northamerica-northeast2 \
      --experiment use_unsupported_python_version
+

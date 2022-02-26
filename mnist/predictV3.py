@@ -22,7 +22,7 @@ import apache_beam as beam
 import tensorflow as tf
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
-
+from kafka import KafkaProducer
 
 
 def singleton(cls):
@@ -74,7 +74,26 @@ def _to_dictionary(line):
     result['key'], result['image'] = line.split(':')
     return result
 
+class ProduceKafkaMessage(beam.DoFn):
 
+    def __init__(self, topic, servers, *args, **kwargs):
+        super(_ProduceKafkaMessage, self).__init__(*args, **kwargs)
+        self.topic=topic;
+        self.servers=servers;
+
+    def start_bundle(self):
+        self._producer = KafkaProducer(**self.servers)
+
+    def finish_bundle(self):
+        self._producer.close()
+
+    def process(self, element):
+        try:
+            self._producer.send(self.topic, element[1], key=element[0])
+            yield element
+        except Exception as e:
+            raise
+            
 def run(argv=None):
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('--input', dest='input', required=True,
@@ -117,7 +136,10 @@ def run(argv=None):
         predictions| "To SQL">> relational_db.Write(source_config=output_config,table_config=table_config)
     elif known_args.source == 'kafka':
         from beam_nuggets.io import kafkaio
-        consumer_config = {"topic": "image_mnist",'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
+        consumer_config = {"topic": "mnist_image",'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
+            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
+            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
+        server_config = {'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
             'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
             'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
         images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
@@ -127,7 +149,8 @@ def run(argv=None):
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
             | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
         predictions |'Print2' >> beam.Map(print)
-    elif known_args.source == 'bg':
+        predictions |'tokafka' >> (beam.ParDo(WordExtractingDoFn("mnist_predict",server_config))
+    elif known_args.source == 'bq':
         schema = 'imageKey:INTEGER'
         for i in range(10):
             schema += (', pred%d:FLOAT' % i)
