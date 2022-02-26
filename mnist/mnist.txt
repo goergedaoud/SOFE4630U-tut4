@@ -63,6 +63,15 @@ mysql -uuser -pSOFE4630U  -h$MYSQLIP <<<"select * from myDB.results;"
 mysql -uuser -pSOFE4630U  -h$MYSQLIP <<<"drop table myDB.results;"
 
 python ./predictV2.py \
+    --staging_location ./staging \
+    --temp_location ./temp \
+    --setup_file ./setup.py \
+    --model ./data \
+    --source kafka \
+	--input $MYSQLIP \
+    --output $MYSQLIP
+
+python ./predictV2.py \
     --runner DataflowRunner \
     --project $PROJECT \
     --staging_location $BUCKET/staging \
@@ -75,3 +84,11 @@ python ./predictV2.py \
 	--region  northamerica-northeast2 \
      --experiment use_unsupported_python_version
 
+python ./predictV3.py \
+    --staging_location ./staging \
+    --temp_location ./temp \
+    --setup_file ./setup.py \
+    --model ./data \
+    --source kafka \
+	--input $MYSQLIP \
+    --output $MYSQLIP

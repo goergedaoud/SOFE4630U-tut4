@@ -149,7 +149,7 @@ def run(argv=None):
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
             | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
         predictions |'Print2' >> beam.Map(print)
-        predictions |'tokafka' >> (beam.ParDo(WordExtractingDoFn("mnist_predict",server_config))
+        predictions |'tokafka2' >> beam.ParDo(ProduceKafkaMessage("mnist_predict",server_config))
     elif known_args.source == 'bq':
         schema = 'imageKey:INTEGER'
         for i in range(10):
