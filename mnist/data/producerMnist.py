@@ -22,5 +22,6 @@ while True:
     arr=line.split(":")
     value={'key':int(arr[0]),'image':arr[1][0:-1]};
     producer.send('mnist_image', value);
-    time.sleep(1);
+    print("Image with key "+arr[0]+" is sent")
+    time.sleep(0.1);
 producer.close();

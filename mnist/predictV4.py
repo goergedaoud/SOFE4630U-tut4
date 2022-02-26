@@ -22,7 +22,7 @@ import apache_beam as beam
 import tensorflow as tf
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
-
+from kafka import KafkaProducer
 
 
 def singleton(cls):
@@ -74,7 +74,26 @@ def _to_dictionary(line):
     result['key'], result['image'] = line.split(':')
     return result
 
+class ProduceKafkaMessage(beam.DoFn):
 
+    def __init__(self, topic, servers, *args, **kwargs):
+        beam.DoFn.__init__(self, *args, **kwargs)
+        self.topic=topic;
+        self.servers=servers;
+
+    def start_bundle(self):
+        self._producer = KafkaProducer(**self.servers)
+
+    def finish_bundle(self):
+        self._producer.close()
+
+    def process(self, element):
+        try:
+            self._producer.send(self.topic, element[1], key=element[0])
+            yield element
+        except Exception as e:
+            raise
+            
 def run(argv=None):
   parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('--input', dest='input', required=True,
@@ -94,7 +113,43 @@ def run(argv=None):
             | 'ConvertToDict'>> beam.Map(_to_dictionary))
         predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
         predictions | 'WriteToText' >> beam.io.WriteToText(known_args.output)
-    elif known_args.source == 'bg':
+    elif known_args.source == 'mysql':
+        from beam_nuggets.io import relational_db
+        input_config = relational_db.SourceConfiguration(
+            drivername='mysql+pymysql', host=known_args.input,  
+            port=3306,                  username='user',
+            password='SOFE4630U',       database='myDB',
+        )
+        output_config = relational_db.SourceConfiguration(
+            drivername='mysql+pymysql', host=known_args.output,  
+            port=3306,                  username='user',
+            password='SOFE4630U',       database='myDB',
+        )
+        images= (p | "Read from SQL">>relational_db.ReadFromDB(source_config=input_config,
+            table_name='images',query='select * from images'));
+        predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model));
+        table_config = relational_db.TableConfiguration(
+            name='results',
+            create_if_missing=True,
+            primary_key_columns=['imageKey']
+        )
+        predictions| "To SQL">> relational_db.Write(source_config=output_config,table_config=table_config)
+    elif known_args.source == 'kafka':
+        from beam_nuggets.io import kafkaio
+        consumer_config = {"topic": known_args.input,'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
+            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
+            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC",\
+                'auto_offset_reset':'latest'}
+        server_config = {'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
+            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
+            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
+        images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
+            consumer_config=consumer_config,value_decoder=bytes.decode) 
+            | 'Writing to stdout' >> beam.Map(lambda x : json.loads(x[1])))
+        predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
+            | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
+        predictions |'tokafka2' >> beam.ParDo(ProduceKafkaMessage(known_args.output,server_config))
+    elif known_args.source == 'bq':
         schema = 'imageKey:INTEGER'
         for i in range(10):
             schema += (', pred%d:FLOAT' % i)
@@ -111,43 +166,6 @@ def run(argv=None):
         predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
         (predictions | 'to byte' >> beam.Map(lambda x: json.dumps(x).encode('utf8'))
             |   'to Pub/sub' >> beam.io.WriteToPubSub(topic=known_args.output));
-    elif known_args.source == 'mysql':
-        from beam_nuggets.io import relational_db
-        source_config = relational_db.SourceConfiguration(
-            drivername='mysql+pymysql',
-            host='34.121.139.39',
-            port=3306,
-            username='user',
-            password='SOFE4630U',
-            database='myDB',
-        )
-        images= (p | "Read from SQL">>relational_db.ReadFromDB(source_config=source_config,
-            table_name='images',query='select * from images'));
-        predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model));
-        table_config = relational_db.TableConfiguration(
-            name='results',
-            create_if_missing=True,
-            primary_key_columns=['imageKey']
-        )
-        predictions| "To SQL">> relational_db.Write(source_config=source_config,table_config=table_config)
-    elif known_args.source == 'kafka':
-        from beam_nuggets.io import kafkaio
-        consumer_config = {"topic": "image_mnist",'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
-            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
-            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
-        images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
-            consumer_config=consumer_config,value_decoder=bytes.decode) 
-            | 'Writing to stdout' >> beam.Map(lambda x : json.loads(x[1])))
-        images |'Print' >> beam.Map(print)
-        predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-            | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
-        predictions |'Print2' >> beam.Map(print)
-        #predictions | 'to kafka' >> beam.io.WriteToPubSub(topic=known_args.output));         
-        #images= (p | "Read from Pub/Sub" >> beam.io.ReadFromPubSub(topic=known_args.input)
-        #    | "toDict" >> beam.Map(lambda x: json.loads(x)));
-        #predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-        #(predictions | 'to byte' >> beam.Map(lambda x: json.dumps(x).encode('utf8'))
-        #    |   'to Pub/sub' >> beam.io.WriteToPubSub(topic=known_args.output)); 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
   run()

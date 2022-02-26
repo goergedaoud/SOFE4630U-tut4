@@ -77,7 +77,7 @@ def _to_dictionary(line):
 class ProduceKafkaMessage(beam.DoFn):
 
     def __init__(self, topic, servers, *args, **kwargs):
-        super(ProduceKafkaMessage, self).__init__(*args, **kwargs)
+        beam.DoFn.__init__(self, *args, **kwargs)
         self.topic=topic;
         self.servers=servers;
 
@@ -138,35 +138,17 @@ def run(argv=None):
         from beam_nuggets.io import kafkaio
         consumer_config = {"topic": known_args.input,'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
             'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
-            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
+            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC",\
+                'auto_offset_reset':'latest'}
         server_config = {'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
             'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
             'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
         images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
             consumer_config=consumer_config,value_decoder=bytes.decode) 
             | 'Writing to stdout' >> beam.Map(lambda x : json.loads(x[1])))
-        #images |'Print' >> beam.Map(print)
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
             | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
-        #predictions |'Print2' >> beam.Map(print)
         predictions |'tokafka2' >> beam.ParDo(ProduceKafkaMessage(known_args.output,server_config))
-    elif known_args.source == 'bq':
-        schema = 'imageKey:INTEGER'
-        for i in range(10):
-            schema += (', pred%d:FLOAT' % i)
-        images = p | 'ReadFromBQ' >> beam.io.Read(beam.io.BigQuerySource(known_args.input))
-        predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-        predictions | 'WriteToBQ' >> beam.io.Write(beam.io.BigQuerySink(
-            known_args.output,
-            schema=schema,
-            create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-            write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE))
-    elif known_args.source == 'PubSub':
-        images= (p | "Read from Pub/Sub" >> beam.io.ReadFromPubSub(topic=known_args.input)
-            | "toDict" >> beam.Map(lambda x: json.loads(x)));
-        predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-        (predictions | 'to byte' >> beam.Map(lambda x: json.dumps(x).encode('utf8'))
-            |   'to Pub/sub' >> beam.io.WriteToPubSub(topic=known_args.output));
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
   run()
