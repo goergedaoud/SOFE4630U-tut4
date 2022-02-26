@@ -20,6 +20,9 @@ import os
 
 import apache_beam as beam
 import tensorflow as tf
+from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.options.pipeline_options import SetupOptions
+
 
 
 def singleton(cls):
@@ -31,17 +34,18 @@ def singleton(cls):
   return getinstance
 
 
+
 @singleton
 class Model():
 
   def __init__(self, checkpoint):
     with tf.Graph().as_default() as graph:
-      sess = tf.InteractiveSession()
-      saver = tf.train.import_meta_graph(os.path.join(checkpoint, 'export.meta'))
+      sess = tf.compat.v1.InteractiveSession()
+      saver = tf.compat.v1.train.import_meta_graph(os.path.join(checkpoint, 'export.meta'))
       saver.restore(sess, os.path.join(checkpoint, 'export'))
 
-      inputs = json.loads(tf.get_collection('inputs')[0])
-      outputs = json.loads(tf.get_collection('outputs')[0])
+      inputs = json.loads(tf.compat.v1.get_collection('inputs')[0])
+      outputs = json.loads(tf.compat.v1.get_collection('outputs')[0])
 
       self.x = graph.get_tensor_by_name(inputs['image'])
       self.p = graph.get_tensor_by_name(outputs['scores'])
@@ -60,14 +64,19 @@ class PredictDoFn(beam.DoFn):
         [model.output_key, model.p],
         feed_dict={model.input_key: [input_key], model.x: [image]})
     result = {}
-    result['key'] = output_key[0]
+    result['imageKey'] = (int)(output_key[0])
     for i, val in enumerate(pred[0].tolist()):
       result['pred%d' % i] = val
     return [result]
 
+def _to_dictionary(line):
+    result = {}
+    result['key'], result['image'] = line.split(':')
+    return result
+
 
 def run(argv=None):
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('--input', dest='input', required=True,
                       help='Input file to process.')
   parser.add_argument('--output', dest='output', required=True,
@@ -77,32 +86,15 @@ def run(argv=None):
   parser.add_argument('--source', dest='source', required=True,
                       help='Data source location (cs|bq).')
   known_args, pipeline_args = parser.parse_known_args(argv)
+  pipeline_options = PipelineOptions(pipeline_args)
+  pipeline_options.view_as(SetupOptions).save_main_session = True;
+  with beam.Pipeline(options=pipeline_options) as p:
+    if known_args.source == 'text':
+        images = (p | 'ReadFromText' >> beam.io.ReadFromText(known_args.input)
+            | 'ConvertToDict'>> beam.Map(_to_dictionary))
+        predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
+        predictions | 'WriteToText' >> beam.io.WriteToText(known_args.output)
 
-  if known_args.source == 'cs':
-    def _to_dictionary(line):
-      result = {}
-      result['key'], result['image'] = line.split(':')
-      return result
-
-    p = beam.Pipeline(argv=pipeline_args)
-    images = (p | 'ReadFromText' >> beam.io.ReadFromText(known_args.input)
-              | 'ConvertToDict'>> beam.Map(_to_dictionary))
-    predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-    predictions | 'WriteToText' >> beam.io.WriteToText(known_args.output)
-
-  else:
-    schema = 'key:INTEGER'
-    for i in range(10):
-      schema += (', pred%d:FLOAT' % i)
-    p = beam.Pipeline(argv=pipeline_args)
-    images = p | 'ReadFromBQ' >> beam.io.Read(beam.io.BigQuerySource(known_args.input))
-    predictions = images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-    predictions | 'WriteToBQ' >> beam.io.Write(beam.io.BigQuerySink(
-        known_args.output,
-        schema=schema,
-        create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-        write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE))
-
+if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
-  p.run()
-
+  run()

@@ -48,9 +48,9 @@ class CustomCommands(setuptools.Command):
       self.RunCustomCommand(command)
 
 
-CUSTOM_COMMANDS = [[
-    'pip', 'install',
-    'https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.8.0-cp27-none-linux_x86_64.whl']]
+CUSTOM_COMMANDS = [['pip', 'install','tensorflow-cpu==2.8.0'],
+#['pip', 'install','beam-nuggets'],
+]
 
 REQUIRED_PACKAGES = []
 
