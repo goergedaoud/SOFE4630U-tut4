@@ -1,1 +1,34 @@
 # https://github.com/GoogleCloudPlatform/dataflow-prediction-example
+
+cd ~
+git clone https://github.com/goergedaoud/SOFE4630U-tut4.git
+cd ~/SOFE4630U-tut4/mnist
+
+PROJECT=$(gcloud config list project --format "value(core.project)")
+echo $PROJECT
+BUCKET=gs://$PROJECT-gs
+echo $BUCKET
+
+gsutil cp data/export* $BUCKET/model/
+gsutil cp data/images.txt $BUCKET/input/
+
+python ./predictV1.py \
+    --staging_location ./staging \
+    --temp_location ./temp \
+    --model ./data \
+    --source text \
+	--setup_file ./setup.py \
+    --input ./data/images.txt \
+    --output ./predict
+	
+python ./predictV1.py \
+    --runner DataflowRunner \
+    --project $PROJECT \
+    --staging_location $BUCKET/staging \
+    --temp_location $BUCKET/temp \
+    --model $BUCKET/model \
+    --source text \
+	--setup_file ./setup.py \
+    --input $BUCKET/input/images.txt \
+    --output $BUCKET/output/predict \
+	--region  northamerica-northeast2 
