@@ -18,7 +18,7 @@ python wordcount.py --output outputs
 
 
 #  cloud storage create
-PROJECT=static-shine-342400
+PROJECT=$(gcloud config list project --format "value(core.project)")
 echo $PROJECT
 BUCKET=gs://$PROJECT-gs
 echo $BUCKET

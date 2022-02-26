@@ -20,10 +20,10 @@ file1 = open('../images.txt', 'r')
 
 while True:
     line = file1.readline()
- 
     if not line:
         break
     arr=line.split(":")
     value={'key':int(arr[0]),'image':arr[1][0:-1]};
     future = publisher.publish(topic_path, json.dumps(value).encode('utf-8'));
-    time.sleep(1);
+    print("Image with key "+arr[0]+" is sent")
+    time.sleep(0.1);

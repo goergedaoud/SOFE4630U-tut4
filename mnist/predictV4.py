@@ -145,10 +145,10 @@ def run(argv=None):
             'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
         images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
             consumer_config=consumer_config,value_decoder=bytes.decode) 
-            | 'Writing to stdout' >> beam.Map(lambda x : json.loads(x[1])))
+            | 'Deserializing' >> beam.Map(lambda x : json.loads(x[1])))
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model)
-            | "tobytes" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
-        predictions |'tokafka2' >> beam.ParDo(ProduceKafkaMessage(known_args.output,server_config))
+            | "Serializing" >> beam.Map(lambda x: (None,json.dumps(x).encode('utf8'))));
+        predictions |'To kafka' >> beam.ParDo(ProduceKafkaMessage(known_args.output,server_config))
     elif known_args.source == 'bq':
         schema = 'imageKey:INTEGER'
         for i in range(10):
