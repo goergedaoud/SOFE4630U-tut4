@@ -96,15 +96,17 @@ def run(argv=None):
         predictions | 'WriteToText' >> beam.io.WriteToText(known_args.output)
     elif known_args.source == 'mysql':
         from beam_nuggets.io import relational_db
-        source_config = relational_db.SourceConfiguration(
-            drivername='mysql+pymysql',
-            host='',  
-            port=3306,
-            username='user',
-            password='SOFE4630U',
-            database='myDB',
+        input_config = relational_db.SourceConfiguration(
+            drivername='mysql+pymysql', host=known_args.input,  
+            port=3306,                  username='user',
+            password='SOFE4630U',       database='myDB',
         )
-        images= (p | "Read from SQL">>relational_db.ReadFromDB(source_config=source_config,
+        output_config = relational_db.SourceConfiguration(
+            drivername='mysql+pymysql', host=known_args.output,  
+            port=3306,                  username='user',
+            password='SOFE4630U',       database='myDB',
+        )
+        images= (p | "Read from SQL">>relational_db.ReadFromDB(source_config=input_config,
             table_name='images',query='select * from images'));
         predictions = (images | 'Prediction' >> beam.ParDo(PredictDoFn(), known_args.model));
         table_config = relational_db.TableConfiguration(
@@ -112,7 +114,7 @@ def run(argv=None):
             create_if_missing=True,
             primary_key_columns=['imageKey']
         )
-        predictions| "To SQL">> relational_db.Write(source_config=source_config,table_config=table_config)
+        predictions| "To SQL">> relational_db.Write(source_config=output_config,table_config=table_config)
         
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)

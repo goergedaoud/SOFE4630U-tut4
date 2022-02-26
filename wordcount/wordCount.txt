@@ -17,10 +17,10 @@ cp /home/goergedaoud2/env/lib/python3.9/site-packages/apache_beam/examples/wordc
 python wordcount.py --output outputs
 
 
-cloud storage create
+#  cloud storage create
 PROJECT=static-shine-342400
 echo $PROJECT
-BUCKET=gs://$PROJECT-sb
+BUCKET=gs://$PROJECT-gs
 echo $BUCKET
 
 python wordcount.py \
