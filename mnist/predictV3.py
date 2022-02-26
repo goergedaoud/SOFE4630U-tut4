@@ -77,7 +77,7 @@ def _to_dictionary(line):
 class ProduceKafkaMessage(beam.DoFn):
 
     def __init__(self, topic, servers, *args, **kwargs):
-        super(_ProduceKafkaMessage, self).__init__(*args, **kwargs)
+        super(ProduceKafkaMessage, self).__init__(*args, **kwargs)
         self.topic=topic;
         self.servers=servers;
 
