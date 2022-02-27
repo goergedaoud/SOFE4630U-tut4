@@ -103,7 +103,7 @@ def run(argv=None):
   parser.add_argument('--model', dest='model', required=True,
                       help='Checkpoint file of the model.')
   parser.add_argument('--source', dest='source', required=True,
-                      help='Data source location (cs|bq).')
+                      help='Data source location (text|mysql|kafka|bq|PubSub).')
   known_args, pipeline_args = parser.parse_known_args(argv)
   pipeline_options = PipelineOptions(pipeline_args)
   pipeline_options.view_as(SetupOptions).save_main_session = True;
