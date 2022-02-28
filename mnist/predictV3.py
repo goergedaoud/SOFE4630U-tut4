@@ -136,13 +136,13 @@ def run(argv=None):
         predictions| "To SQL">> relational_db.Write(source_config=output_config,table_config=table_config)
     elif known_args.source == 'kafka':
         from beam_nuggets.io import kafkaio
-        consumer_config = {"topic": known_args.input,'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
-            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
-            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC",\
+        consumer_config = {"topic": known_args.input,'bootstrap_servers':'',\
+            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'',\
+            'sasl_plain_password':"",\
                 'auto_offset_reset':'latest'}
-        server_config = {'bootstrap_servers':'pkc-lzvrd.us-west4.gcp.confluent.cloud:9092',\
-            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'WAXLLO4EUQ6SUGAU',\
-            'sasl_plain_password':"3QIS5FEvLumTlsmFWulH/5FQiKZyUEATSJikaQ9jvbVJeudmkb5LwK4v6K9CmXBC"}
+        server_config = {'bootstrap_servers':'',\
+            'security_protocol':'SASL_SSL','sasl_mechanism':'PLAIN','sasl_plain_username':'',\
+            'sasl_plain_password':""}
         images = (p | "Reading messages from Kafka" >> kafkaio.KafkaConsume(
             consumer_config=consumer_config,value_decoder=bytes.decode) 
             | 'Deserializing' >> beam.Map(lambda x : json.loads(x[1])))
